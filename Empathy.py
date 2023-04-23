@@ -6,6 +6,7 @@
 
 import os
 import pandas as pd
+import numpy as np
 from sklearn.preprocessing import MinMaxScaler
 import matplotlib.pyplot as plt
 from sklearn.decomposition import PCA
@@ -23,62 +24,101 @@ import matplotlib.pyplot as plt
 
 # # Loading and Preparing the Data
 
-# In[124]:
+# In[79]:
 
 
-# specify directory containing the csv files
-directory = "EyeT/EyeT"
+import os
+import pandas as pd
+import re
 
-# create an empty list to store the loaded dataframes
-dataframes = []
+def loadData(directory):
+    # create an empty list to store the loaded dataframes
+    dataframes = []
+    # Load the QuestionnaireIB.csv file
+    questionnaire_ib = pd.read_csv('QuestionnaireIB.csv', encoding='ISO-8859-1')
+    
+    # Specify the columns for interpolation
+    columns_to_interpolate = ['Gaze point X', 'Gaze point Y', 'Gaze point left X', 'Gaze point left Y', 
+                              'Gaze point right X', 'Gaze point right Y', 'Gaze direction left X', 
+                              'Gaze direction left Y', 'Gaze direction left Z', 'Gaze direction right X', 
+                              'Gaze direction right Y', 'Gaze direction right Z']
+    
+    # Columns to check duplicates
+    columns_to_check = ['Participant name', 'Eye movement type', 'Recording duration', 'Gaze event duration', 'Pupil diameter left', 'Pupil diameter right']
 
-# loop through all files in the directory and load csv files with "dataset_III" in their name
-for filename in os.listdir(directory):
+    # loop through all files in the directory and load csv files with "dataset_III" in their name
+    for filename in os.listdir(directory):
+        if "dataset_II_" in filename and filename.endswith(".csv"):
+            filepath = os.path.join(directory, filename)
+            df = pd.read_csv(filepath)
+            df.drop('Participant name', axis=1, inplace=True)
+            # Extract trial number from the filename
+            trial = int(filename.split('_trial_')[1].split('.')[0])
+            pattern = r"participant_(\d+)_trial"
+            match = re.search(pattern, filename)
 
-    if "dataset_III" in filename and filename.endswith(".csv"):
-        filepath = os.path.join(directory, filename)
-        df = pd.read_csv(filepath)
-        # Columns to check duplicates
-        columns_to_check = ['Participant name', 'Eye movement type', 'Recording duration', 'Gaze event duration', 'Pupil diameter left', 'Pupil diameter right']
+            if match:
+                participant = match.group(1)
+            else:
+                print("Participant number not found in filename.")
+            # Add 'Trial' column to the dataframe and fill it with trial number
+            df['Trial'] = trial
+            df['Participant name'] = 'Participant'+participant
+            df = pd.merge(df, questionnaire_ib[['Participant name','Total Score extended']], on='Participant name', how='left')
+           
+            for col in columns_to_interpolate:
+                # Use interpolate() method with cubic interpolation for NaN values
+                df[col] = df[col].interpolate(method='cubic')
+                # Use fillna() method to fill remaining NaN values with original values
 
-        # Replace , with . only for object type columns
-        obj_cols = df.select_dtypes(include=['object']).columns
+            df.fillna(method='backfill', inplace=True)
+            df.fillna(method='ffill', inplace=True)
 
-        # Loop over the columns and try to convert to numeric data type
-        for col in obj_cols:
-            try:
-                df[col] = pd.to_numeric(df[col].str.replace(',', '.'))
-            except ValueError:
-                # If the conversion fails, do nothing
-                pass
-            if df[col].apply(lambda x: str(x).isnumeric()).all():
-                df[col] = pd.to_numeric(df[col], errors='coerce')
-        # Drop exact duplicate rows based on specified columns
-        df.drop_duplicates(subset=columns_to_check, keep='first', inplace=True)
+            # Replace , with . only for object type columns
+            obj_cols = df.select_dtypes(include=['object']).columns
 
-        # Reset index
-        df.reset_index(drop=True, inplace=True)
-        df = df.drop(columns=['Unnamed: 0'])
-        dataframes.append(df)
+            # Loop over the columns and try to convert to numeric data type
+            for col in obj_cols:
+                try:
+                    df[col] = pd.to_numeric(df[col].str.replace(',', '.'))
+                except ValueError:
+                    # If the conversion fails, do nothing
+                    pass
+                if df[col].apply(lambda x: str(x).isnumeric()).all():
+                    df[col] = pd.to_numeric(df[col], errors='coerce')
+            # Drop exact duplicate rows based on specified columns
+            df.drop_duplicates(subset=columns_to_check, keep='first', inplace=True)
 
-# concatenate all dataframes into one dataframe
-all_data = pd.concat(dataframes, ignore_index=True)
+            # Reset index
+            df.reset_index(drop=True, inplace=True)
+            df = df.drop(columns=['Unnamed: 0'])
+            dataframes.append(df)
 
-# print the shape of the resulting dataframe
-print("Shape of the loaded data:", all_data.shape)
+    # concatenate all dataframes into one dataframe
+    all_data = pd.concat(dataframes, ignore_index=True)
+
+    # print the shape of the resulting dataframe
+    print("Shape of the loaded data:", all_data.shape)
+    return all_data
+
+all_data = loadData("EyeT/EyeT")
+df = all_data.copy()
 
 
-# Merging and using only **Dataset III** as it was specifically collected for the purpose of assessing empathy using eye tracking data on gaze typing experiment. Also, we are checking for duplicates on 'Participant name', 'Recording duration', 'Gaze event duration', 'Pupil diameter left', 'Pupil diameter right' column and dropping duplicate rows and the column **'Unnamed: 0'** as it is unecessary. Furthermore, we are replacing the ',' with '.' to make the columns numerical. Also, changing the dataype of columns to **'float'** that are actually numbers or scalar type but the dataype is currently 'object'. We are doing this so we can use these for correlation and PCA etc and we won't loose meaningful information.
+# Merging and using dataset II(explaination and evaluation for this selection at the end). Also, we are checking for duplicates on 'Participant name', 'Recording duration', 'Gaze event duration', 'Pupil diameter left', 'Pupil diameter right' column and dropping duplicate rows and the column **'Unnamed: 0'** as it is unecessary. Furthermore, we are replacing the ',' with '.' to make the columns numerical. Also, changing the dataype of columns to **'float'** that are actually numbers or scalar type but the dataype is currently 'object'. We are doing this so we can use these for correlation and PCA etc and we won't loose meaningful information.
+# 
+# Moreover, merging the **Total Score extended** of **Questionnaire IB**. We will be using the Total Score Extended as our output variable and we are using this as it includes the score of all the questions from the original questionnaire, plus additional questions.
 
 # # Exploring the data
 
-# In[125]:
+# In[80]:
 
 
-all_data.tail()
+all_data = df.copy()
+all_data
 
 
-# In[126]:
+# In[81]:
 
 
 pd.set_option('display.max_columns', None)
@@ -89,7 +129,7 @@ print(all_data.dtypes)
 
 # Checking for data types after the data has been loaded, doing this to ensure no meaningful column is left with unexpected datatype.
 
-# In[127]:
+# In[82]:
 
 
 import matplotlib.pyplot as plt
@@ -120,37 +160,65 @@ plt.title('Eyetracker Timestamp vs Recording Duration')
 plt.show()
 
 
-# This plot shows the relationship between Eyetracker timestamp and Recording duration. We can observe that apart for some outliers, most of the data was actually collected at the very beggining of the time tracker timestamp. Or, we could say that time tracker device did not took time to initialize or stabilize before recording accurate data.
+# This plot shows the Recording duration was majorly between 30 sec to 1 minute 30 swecond.
 
-# In[128]:
+# In[83]:
 
 
 pd.reset_option('display.max_columns')
 pd.reset_option('display.max_rows')
 
 
-# In[129]:
+# In[84]:
 
 
-# Load the QuestionnaireIB.csv file
-questionnaire_ib = pd.read_csv('QuestionnaireIB.csv', encoding='ISO-8859-1')
+# Import libraries
+import matplotlib.pyplot as plt
 
-# Merge the Empathy_Score column from questionnaire_ib into all_data based on Participant name
-all_data = pd.merge(all_data, questionnaire_ib[['Participant name','Total Score extended']], on='Participant name', how='left')
-all_data
+# Specify the columns for interpolation
+columns_to_interpolate = ['Gaze point X', 'Gaze point Y', 'Gaze point left X', 'Gaze point left Y', 
+                          'Gaze point right X', 'Gaze point right Y', 'Gaze direction left X', 
+                          'Gaze direction left Y', 'Gaze direction left Z', 'Gaze direction right X', 
+                          'Gaze direction right Y', 'Gaze direction right Z']
+
+# Specify the gaze duration column
+gaze_duration_column = 'Gaze event duration'
+
+# Loop through each column and create scatter plots and line plots
+for col in columns_to_interpolate:
+    # Filter rows with missing values in the column
+    missing_mask = all_data[col].isna()
+    
+    # Extract gaze duration for missing and non-missing values
+    gaze_duration_missing = all_data.loc[missing_mask, gaze_duration_column]
+    gaze_duration_non_missing = all_data.loc[~missing_mask, gaze_duration_column]
+    
+    # Extract column values for missing and non-missing values
+    col_values_missing = all_data.loc[missing_mask, col]
+    col_values_non_missing = all_data.loc[~missing_mask, col]
+    
+    # Create scatter plot of gaze duration vs column values
+    plt.figure()
+    plt.scatter(gaze_duration_non_missing, col_values_non_missing, label='Non-missing')
+    plt.scatter(gaze_duration_missing, col_values_missing, label='Missing', color='red', marker='x')
+    plt.xlabel('Gaze Duration')
+    plt.ylabel(col)
+    plt.title(f'Gaze Duration vs {col}')
+    plt.legend()
+    plt.show()
 
 
-# Merging the **Total Score extended** of **Questionnaire IB**. We will be using the Total Score Extended as our output variable and we are using this as it includes the score of all the questions from the original questionnaire, plus additional questions.
+# The above relationship shows the relationship of gaze direction and gaze point with gaze duration. We can observe that data is mostly skewed and in some cases where it is asymmetrical or triangle like shape, the data is decreasing after some duration. This shows that data is actually non linear
 
-# In[162]:
+# In[85]:
 
 
 all_data.hist(bins=50, figsize=(20,15))
 
 
-# We can observe that mostly the data is skewed towards either side, only the recording duration is having kind of a symmetric distribution.
+# This histogram plot shows that in some cases data is dtricktly skewed and in some cases it is syymetrical. We can also see some irregular spike, this shows us that data needs further preprocessing.
 
-# In[130]:
+# In[86]:
 
 
 import pandas as pd
@@ -184,7 +252,7 @@ grouped
 
 # We have created a new df that has sum of Recording duration and	Gaze event duration for each participant as well as their extended score.
 
-# In[131]:
+# In[87]:
 
 
 import matplotlib.pyplot as plt
@@ -197,9 +265,9 @@ plt.title('Total Recording duration vs Participant')
 plt.show()
 
 
-# In this plot we can observe that majority of the participant took total duration of 0.8le^10 with 2 outliers as well.
+# In this plot we can observe that majority of the participant took almost similar total duration to perform the activity, some outliers can also be observed.
 
-# In[132]:
+# In[88]:
 
 
 import matplotlib.pyplot as plt
@@ -212,9 +280,9 @@ plt.title('Total Gaze Event Duration vs Total Score Extended')
 plt.show()
 
 
-# We can observe a ceiling effect on Total Gaze Event Duration vs Total Score Extended. the score is increasing as total gaze duraion is increasing and after duration reaches 0.5le^7 it started decreasing, this suggest that relationship between them is non linear.
+# We can observe a ceiling effect on Total Gaze Event Duration vs Total Score Extended. the score is increasing as total gaze duraion is increasing and after duration reaches 3e^6 it started decreasing, this suggest that relationship between them is non linear.
 
-# In[133]:
+# In[89]:
 
 
 import matplotlib.pyplot as plt
@@ -227,15 +295,18 @@ plt.title('Recording duration vs Total Score Extended')
 plt.show()
 
 
-# We can observe a ceiling effect on Total Recording duration vs Total Score Extended. The score is increasing as total recording duraion is increasing and after duration reaches 0.3le^10 it started decreasing, this suggest that relationship between them is non linear.
+# We can observe an irregular behaviour of score with duration, it is dropping and rising within the first quartile of duration. Again this is non linear.
 
-# In[134]:
+# In[90]:
 
+
+pd.reset_option('display.max_columns')
+pd.reset_option('display.max_rows')
 
 print("nulls:",all_data.isnull().sum())
 
 
-# In[135]:
+# In[91]:
 
 
 # perform one-hot encoding
@@ -252,7 +323,7 @@ all_data_copy = all_data
 
 # Performing one hot encoding on **Eye movement type** because based it might have some important information and we need to perform correalation on these as well.
 
-# In[136]:
+# In[92]:
 
 
 # Compute correlation matrix
@@ -265,7 +336,7 @@ print(score_corr)
 
 # We can observe that corelation matrix is majorly negative and not showing any strong correlation of differnt columns with Total Score Extended.
 
-# In[137]:
+# In[93]:
 
 
 numeric_cols = all_data.select_dtypes(include=['float64', 'int64','uint8']).columns.tolist()
@@ -275,7 +346,7 @@ df_numeric = df_numeric.fillna(0)
 
 # Selecting all the numeric columns so we can normalize it by filling nans with 0 to perform regressor feature extraction and PCA to extract some features.
 
-# In[138]:
+# In[94]:
 
 
 # Create the scaler object
@@ -290,7 +361,14 @@ df_normalized = pd.DataFrame(df_scaled, columns=df_numeric.columns)
 
 # Normalizing the data so we have everything scaled within a range.
 
-# In[139]:
+# In[95]:
+
+
+y = df_normalized['Total Score extended']
+X = df_normalized.drop(['Total Score extended'], axis=1)
+
+
+# In[96]:
 
 
 # Fit the decision tree regressor to the data
@@ -302,7 +380,7 @@ importances = clf.feature_importances_
 importances
 
 
-# In[140]:
+# In[97]:
 
 
 # Calculate feature importances
@@ -318,19 +396,19 @@ importances_dict = {attr: imp for attr, imp in zip(X.columns, importances)}
 importances_dict
 
 
-# Here we can see that majorly Recording Duration has most of the impact on the model with contribution of almost 95%
+# Here we can see that eye position right X and Y are showing some significant numbers, among the columns that are useful according to the domain knowledge.
 
 # # PCA
 
-# In[141]:
+# In[98]:
 
 
 # One-hot encode categorical variables
 data_encoded = df_normalized
 
 # Separate target variable
-y = data_encoded['Total Score extended']
-X = data_encoded.drop(['Total Score extended'], axis=1)
+y = df_normalized['Total Score extended']
+X = df_normalized.drop(['Total Score extended'], axis=1)
 
 # Perform PCA
 pca = PCA()
@@ -350,7 +428,7 @@ plt.ylabel('PCA 2')
 plt.show()
 
 
-# In[142]:
+# In[99]:
 
 
 #Extract the most important features
@@ -371,204 +449,262 @@ for i, (feature, score) in enumerate(top_features):
     print(f"{i+1}. {feature}: {score:.3f}")
 
 
-# Here we have list of all the useful features and their contributions identofied by PCA. At this point we have regressor identified columns as well as PCA ones, now we will apply our domain knowledge to filter the useful features.
+# Here we have list of all the useful features and their contributions identified by PCA. At this point we have regressor identified columns as well as PCA ones, now we will apply our domain knowledge to filter and extract the useful features.
 
 # # Preparing the data
 
-# In[143]:
+# In[100]:
+
+
+import pandas as pd
+
+# Group the data by Participant and Trial, and find the mode of each group
+# df_mode = all_data.groupby(['Participant name', 'Trial']).apply(lambda x: x.mode().iloc[0])
+
+def aggregate_func(group):
+    return group.mode().iloc[0]
+
+# Groupby 'Participant' and 'Trial', and apply the custom aggregation function
+result = all_data.groupby(['Participant name', 'Trial']).apply(aggregate_func).reset_index(drop=True)
+
+result
+
+
+# In[101]:
+
+
+count = result.groupby('Participant name').size().reset_index(name='Count')
+
+print(count)
+
+
+# Since we have multiple trials for each participant and rows are almost identical, we are extracting mode row, i.e. the one mostly repeated. Extracting one row for each trial and for each participant.
+
+# In[102]:
+
+
+import pandas as pd
+from sklearn.model_selection import train_test_split
+
+# Assume 'Trial' column represents time periods
+
+# Sort the dataframe by 'Trial'
+result = result.sort_values('Trial')
+result
+
+
+# Here, we are sorting the rows on the basis of trial id so we can treat this problem as time series. As this was highlighted in the feedback that this should be treated as time series problem.
+
+# In[103]:
 
 
 # Define the useful columns and dropping the rest
-cols_to_keep = ['Recording duration', 'Pupil diameter left', 'Pupil diameter right', 'Gaze event duration', 'EyesNotFound','Fixation','Saccade','Unclassified','Gaze event duration', 'Gaze point X', 'Gaze point Y','Gaze point left X','Gaze point left Y','Gaze point right X','Gaze point right Y','Gaze direction left X','Gaze direction left Y','Gaze direction left Z','Gaze direction right X','Gaze direction right Y','Gaze direction right Z','Total Score extended']
-all_data = all_data_copy.drop(columns=[col for col in all_data.columns if col not in cols_to_keep])
+cols_to_keep = ['Recording duration', 'Pupil diameter left', 'Pupil diameter right', 'Gaze event duration', 'EyesNotFound','Fixation','Saccade','Unclassified','Gaze event duration', 'Gaze point X', 'Gaze point Y','Gaze point left X','Gaze point left Y','Gaze point right X','Gaze point right Y','Gaze direction left X','Gaze direction left Y','Gaze direction left Z','Gaze direction right X','Gaze direction right Y','Gaze direction right Z','Total Score extended','Participant name']
+all_data = result.drop(columns=[col for col in result.columns if col not in cols_to_keep])
 
 
 # Here, we have idenfitifed and filtered out the useful features. The selection is based on their contribution as well as domain knowledge.
 
-# In[144]:
+# In[104]:
 
 
-# Create an instance of IterativeImputer
-imputer = IterativeImputer()
-
-# Fit the imputer to the data
-imputer.fit(all_data[cols_to_keep])
-
-# Transform the data, replacing the missing values with the imputed values
-all_data[cols_to_keep] = imputer.transform(all_data[cols_to_keep])
+all_data
 
 
-# Now, we are imputing the data with iterative impute approach of scikit with **Baysian Ridge** method which is the defaut method. This will fill the null values more effieciently rather than filling with 0. Please note that it will fill the values within the range of the observed or currently available data so the data won't be out of the current range. Eg: if pupil diamter is in a range of 0-40, imputation will also be within this range.
-
-# In[145]:
+# In[105]:
 
 
-all_data[cols_to_keep]
+all_data['Participant name'] = all_data['Participant name'].str.extract(r'(\d+)')
 
 
-# In[146]:
+# In[106]:
+
+
+pd.reset_option('display.max_columns')
+pd.reset_option('display.max_rows')
+
+print("nulls:",all_data.isnull().sum())
+
+pd.reset_option('display.max_columns')
+pd.reset_option('display.max_rows')
+
+
+# In[107]:
 
 
 # Create the scaler object
-scaler = MinMaxScaler()
+scalerSelectedCols = MinMaxScaler()
 
 # Fit and transform the data
-df_scaled = scaler.fit_transform(all_data[cols_to_keep])
+df_scaled = scalerSelectedCols.fit_transform(all_data)
 
 # Convert the scaled data back to a DataFrame
-df_normalized = pd.DataFrame(df_scaled, columns=all_data[cols_to_keep].columns)
+df_normalized = pd.DataFrame(df_scaled, columns=all_data.columns)
+df_normalized
 
 
 # # Training and Evaluating the Model
 
-# In[147]:
+# In[108]:
 
 
-# assuming your DataFrame is called 'df_normalized' and the target variable is called 'y'
+from sklearn.model_selection import GroupShuffleSplit
+
+# Assuming your DataFrame is called 'df_normalized' and the target variable is called 'y'
 X = df_normalized.drop('Total Score extended', axis=1)
 y = df_normalized['Total Score extended']
+groups = df_normalized['Participant name']  # Specify the group variable
 
-# split the data into 70% train and 30% test sets
-X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.3, random_state=42)
+# Create an instance of GroupShuffleSplit with the desired number of splits and test set size
+n_splits = 1 
+test_size = 0.3  # You can adjust this value as needed
+group_shuffle_split = GroupShuffleSplit(n_splits=n_splits, test_size=test_size, random_state=42)
 
-# verify the shapes of the resulting arrays
-print("Shape of X_train:", X_train.shape)
-print("Shape of y_train:", y_train.shape)
-print("Shape of X_test:", X_test.shape)
-print("Shape of y_test:", y_test.shape)
+# Iterate over the group-wise splits
+for train_index, test_index in group_shuffle_split.split(X, y, groups):
+    X_train, X_test = X.iloc[train_index], X.iloc[test_index]
+    y_train, y_test = y.iloc[train_index], y.iloc[test_index]
+    # Use X_train, y_train for training and X_test, y_test for testing
+    # You can also print the shapes of the resulting arrays for verification
+    print("Shape of X_train:", X_train.shape)
+    print("Shape of y_train:", y_train.shape)
+    print("Shape of X_test:", X_test.shape)
+    print("Shape of y_test:", y_test.shape)
 
 
 # Here, we have normalized and splitted the data into train test. We will be using this split for our model training.
 
-# In[148]:
+# In[109]:
 
 
-from sklearn.model_selection import cross_val_score
+from sklearn.model_selection import cross_val_score, GroupKFold
+from sklearn.ensemble import RandomForestRegressor
+from sklearn.metrics import mean_squared_error
 
 # create an instance of the Random Forest Regressor class
 rf = RandomForestRegressor(n_estimators=100, random_state=42)
 
-# perform 5-fold cross-validation on the model
-scores = cross_val_score(rf, X, y, cv=5, scoring='neg_mean_squared_error', n_jobs=-1)
+# define the number of folds for cross-validation
+num_folds = 10
 
+# create an instance of GroupKFold with the number of folds
+gkf = GroupKFold(n_splits=num_folds)
+
+# perform group k-fold cross-validation on the model
+scores = -cross_val_score(rf, X, y, cv=gkf, groups=df_normalized['Participant name'], scoring='neg_mean_squared_error', n_jobs=-1)
+
+variance = np.var(y)
+
+# Create a DataFrame to store the MSE and R2 scores
+df_scores_D2 = pd.DataFrame({'R2 score': 1 - (scores/variance),'MSE':scores})
 # compute the mean and standard deviation of the scores
-mean_score = -scores.mean()
+mean_score = scores.mean()
 std_score = scores.std()
 
-print("Mean Squared Error (MSE) on cross-validation: {:.3f} +/- {:.3f}".format(mean_score, std_score))
+print("Mean Squared Error (MSE) on group k-fold cross-validation: {:.3f} +/- {:.3f}".format(mean_score, std_score))
+df_scores_D2
 
 
-# Here, we have validated the randomforest regressor with 5 foldds. MSE is **0.046** which is very low and this suggest that the model is quite accurate. We also have standard deviation of MSE on cross-validated folds which is **0.026**, again low deviation suggest the model is quite stable.
+# Now, we are cross validating the rando forest regressor on 10 folds with group k fold method so we can have different participant each time when training and testing and also grouping them together, this will show us the actual performance of the model and we can handle the data leakage. Please note that we I have again changed the evaluation type and now this will be treated like a normal regression problem instead of a timeseries regression prblem as it does not make sense.
 
-# In[149]:
+# Here, we have validated the randomforest regressor with 10 folds. The mean of 10 fold MSE is **0.032** which is very low and this suggest that the model is quite accurate. We also have standard deviation of MSE on cross-validated folds which is **0.024**, again low deviation suggest the model is quite stable.
+
+# In[110]:
 
 
-# create an instance of the Random Forest Regressor class
+import pandas as pd
+from sklearn.ensemble import RandomForestRegressor
+from sklearn.metrics import mean_squared_error, r2_score
+
+# Create an instance of the Random Forest Regressor class
 rf = RandomForestRegressor(n_estimators=100, random_state=42, n_jobs=-1)
 
-# fit the model to the training data
+# Fit the model to the training data
 rf.fit(X_train, y_train)
 
-# make predictions on the test data
+# Make predictions on the test data
 y_pred = rf.predict(X_test)
 
-# compute the mean squared error on the test set
+# Compute the mean squared error on the test set
 mse = mean_squared_error(y_test, y_pred)
+
+# Compute the R2 score on the test set
+r2 = r2_score(y_test, y_pred)
+
+# Display the mean squared error (MSE) and R2 score
 print("Mean Squared Error (MSE) on test set: {:.3f}".format(mse))
+print("R2 Score on test set: {:.3f}".format(r2))
 
 
-# To our surprise we can see the model is giving the MSE of 0.000 which suggest the model's accuracy is 100%. Please note that we have already dropped the duplicates and filled the nans so this possibly is not the case of over fitting.
+# To our surprise we can see the model is giving the MSE of 0.007 and R2 score of 0.832 which suggest the model's accuracy is 83.2%. Please note that we have already dropped the duplicates and filled the nans so this possibly is not the case of over fitting.
 
 # # Predicting
 
-# In[159]:
+# In[111]:
 
 
-# Load the test data
-test = pd.read_csv('EyeT/EyeT/EyeT_group_dataset_II_image_name_grey_blue_participant_2_trial_0.csv')
+def predict(test):
+    testDf = test.copy()
+    y_pred = rf.predict(testDf)
+    testDf['Total Score extended'] = y_pred
+    y_pred_denormalized = scalerSelectedCols.inverse_transform(testDf)
+    pred = pd.DataFrame(y_pred_denormalized)
+    print("Empathy Score",pred.iloc[0][16])
+    # Calculate feature importances
+    importances = rf.feature_importances_
 
-columns_to_check = ['Participant name', 'Eye movement type', 'Recording duration', 'Gaze event duration', 'Pupil diameter left', 'Pupil diameter right']
+    # Convert the values to regular numbers
+    importances = np.round(importances * 100, decimals=3)
 
-test.drop_duplicates(subset=columns_to_check, keep='first', inplace=True)
+    # Create a dictionary to map attribute names with importance values
+    importances_dict = {attr: imp for attr, imp in zip(X.columns, importances)}
 
-# Reset index
-test.reset_index(drop=True, inplace=True)
-
-# perform one-hot encoding
-one_hot = pd.get_dummies(test['Eye movement type'])
-
-# concatenate the one-hot encoded columns to the original dataframe
-test = pd.concat([test, one_hot], axis=1)
-
-# drop the original categorical column
-test.drop('Eye movement type', axis=1, inplace=True)
-
-test['Total Score extended'] = '0'
-
-df = test
-
-# Replace , with . only for object type columns
-obj_cols = df.select_dtypes(include=['object']).columns
-
-# Loop over the columns and try to convert to numeric data type
-for col in obj_cols:
-    try:
-        df[col] = pd.to_numeric(df[col].str.replace(',', '.'))
-    except ValueError:
-        # If the conversion fails, do nothing
-        pass
-    if df[col].apply(lambda x: str(x).isnumeric()).all():
-        df[col] = pd.to_numeric(df[col], errors='coerce')
-
-cols_to_keep = ['Recording duration', 'Pupil diameter left', 'Pupil diameter right', 'Gaze event duration', 'EyesNotFound','Fixation','Saccade','Unclassified','Gaze event duration', 'Gaze point X', 'Gaze point Y','Gaze point left X','Gaze point left Y','Gaze point right X','Gaze point right Y','Gaze direction left X','Gaze direction left Y','Gaze direction left Z','Gaze direction right X','Gaze direction right Y','Gaze direction right Z','Total Score extended']
-
-# Extract the columns of interest from the test data
-test_data = df[cols_to_keep]
-
-# Use the fitted imputer to transform the test data
-imputed_test_data = imputer.transform(test_data)
-
-# Replace the missing values in the test data with the imputed values
-test_data = imputed_test_data
-
-# Transform the test data using the previously fitted scaler object
-test_data_scaled = scaler.transform(test_data)
-
-test_data = pd.DataFrame(test_data_scaled)
-
-# Convert the scaled test data back to a DataFrame
-test_data_normalized = pd.DataFrame(test_data_scaled, columns=test_data.columns)
-test_data_normalized = imputer.transform(test_data_normalized)
-
-test_data_normalized = pd.DataFrame(test_data_normalized)
-test_data_normalized.drop(21, axis=1, inplace=True)
-
-# Predict
-score = rf.predict(test_data_normalized)
-
-test_data_normalized['score'] = score
-
-# Use the trained scaler object to denormalize the predicted values
-y_pred_denormalized = scaler.inverse_transform(test_data_normalized)
-
-pred = pd.DataFrame(y_pred_denormalized)
-
-# Get the Score and the features that contributed
-score = pred[21][0]
-print("Empathy Score",score)
-
-# Calculate feature importances
-importances = rf.feature_importances_
-
-# Convert the values to regular numbers
-importances = np.round(importances * 100, decimals=3)
-
-# Create a dictionary to map attribute names with importance values
-importances_dict = {attr: imp for attr, imp in zip(X.columns, importances)}
-
-# Print the dictionary
-print("\nThe Explaination for the Score: below we have a dictionary with contribution score where, 100% means mostly contributed:")
-importances_dict
+    # Print the dictionary
+    print("\nThe Explaination for the Score: below we have a dictionary with contribution score where, 100% means mostly contributed:")
+    return importances_dict
+predict(X_test)
 
 
-# The above cell is the final cell and is responsible to predict score. We just have to load onboarding potential employee's required data into test dataset and it will return the empathy score and the reason for the score with a key:value pair. Where, key is the feature and value will be its contribution towards the score.
+# # Dataset Comparison
+
+# In[112]:
+
+
+import matplotlib.pyplot as plt
+import pandas as pd
+
+# Create a figure for R2 score plot
+fig1, ax1 = plt.subplots()
+# Plot R2 score for D3
+df_scores_D3.plot(y='R2 score', ax=ax1, label='D3 R2 Score', kind='line')
+# Plot R2 score for D2
+df_scores_D2.plot(y='R2 score', ax=ax1, label='D2 R2 Score', kind='line')
+# Set the title, labels, and legend for the R2 score plot
+ax1.set_title('R2 Score for Participants in D3 and D2')
+ax1.set_xlabel('Fold')
+ax1.set_ylabel('R2 Score')
+ax1.legend()
+
+# Create a figure for MSE plot
+fig2, ax2 = plt.subplots()
+# Plot MSE for D3
+df_scores_D3.plot(y='MSE', ax=ax2, label='D3 MSE', kind='line', color='red')
+# Plot MSE for D2
+df_scores_D2.plot(y='MSE', ax=ax2, label='D2 MSE', kind='line', color='green')
+# Set the title, labels, and legend for the MSE plot
+ax2.set_title('MSE for Participants in D3 and D2')
+ax2.set_xlabel('Fold')
+ax2.set_ylabel('MSE')
+ax2.legend()
+
+# Show the plots
+plt.show()
+
+
+# Here we have plotted the MSE and R2 score on each fold and we can clearly see that dataset II performed way better than dataset III. This is the reason we have selected this dataset.
+
+# In[ ]:
+
+
+
+
