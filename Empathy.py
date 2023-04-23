@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 # coding: utf-8
 
-# In[1]:
+# In[113]:
 
 
 import os
@@ -24,7 +24,7 @@ import matplotlib.pyplot as plt
 
 # # Loading and Preparing the Data
 
-# In[79]:
+# In[267]:
 
 
 import os
@@ -111,14 +111,14 @@ df = all_data.copy()
 
 # # Exploring the data
 
-# In[80]:
+# In[268]:
 
 
 all_data = df.copy()
 all_data
 
 
-# In[81]:
+# In[269]:
 
 
 pd.set_option('display.max_columns', None)
@@ -129,7 +129,7 @@ print(all_data.dtypes)
 
 # Checking for data types after the data has been loaded, doing this to ensure no meaningful column is left with unexpected datatype.
 
-# In[82]:
+# In[270]:
 
 
 import matplotlib.pyplot as plt
@@ -162,14 +162,14 @@ plt.show()
 
 # This plot shows the Recording duration was majorly between 30 sec to 1 minute 30 swecond.
 
-# In[83]:
+# In[271]:
 
 
 pd.reset_option('display.max_columns')
 pd.reset_option('display.max_rows')
 
 
-# In[84]:
+# In[272]:
 
 
 # Import libraries
@@ -210,7 +210,7 @@ for col in columns_to_interpolate:
 
 # The above relationship shows the relationship of gaze direction and gaze point with gaze duration. We can observe that data is mostly skewed and in some cases where it is asymmetrical or triangle like shape, the data is decreasing after some duration. This shows that data is actually non linear
 
-# In[85]:
+# In[273]:
 
 
 all_data.hist(bins=50, figsize=(20,15))
@@ -218,7 +218,7 @@ all_data.hist(bins=50, figsize=(20,15))
 
 # This histogram plot shows that in some cases data is dtricktly skewed and in some cases it is syymetrical. We can also see some irregular spike, this shows us that data needs further preprocessing.
 
-# In[86]:
+# In[274]:
 
 
 import pandas as pd
@@ -252,7 +252,7 @@ grouped
 
 # We have created a new df that has sum of Recording duration and	Gaze event duration for each participant as well as their extended score.
 
-# In[87]:
+# In[275]:
 
 
 import matplotlib.pyplot as plt
@@ -267,7 +267,7 @@ plt.show()
 
 # In this plot we can observe that majority of the participant took almost similar total duration to perform the activity, some outliers can also be observed.
 
-# In[88]:
+# In[276]:
 
 
 import matplotlib.pyplot as plt
@@ -282,7 +282,7 @@ plt.show()
 
 # We can observe a ceiling effect on Total Gaze Event Duration vs Total Score Extended. the score is increasing as total gaze duraion is increasing and after duration reaches 3e^6 it started decreasing, this suggest that relationship between them is non linear.
 
-# In[89]:
+# In[277]:
 
 
 import matplotlib.pyplot as plt
@@ -297,7 +297,7 @@ plt.show()
 
 # We can observe an irregular behaviour of score with duration, it is dropping and rising within the first quartile of duration. Again this is non linear.
 
-# In[90]:
+# In[278]:
 
 
 pd.reset_option('display.max_columns')
@@ -306,7 +306,7 @@ pd.reset_option('display.max_rows')
 print("nulls:",all_data.isnull().sum())
 
 
-# In[91]:
+# In[279]:
 
 
 # perform one-hot encoding
@@ -323,7 +323,7 @@ all_data_copy = all_data
 
 # Performing one hot encoding on **Eye movement type** because based it might have some important information and we need to perform correalation on these as well.
 
-# In[92]:
+# In[280]:
 
 
 # Compute correlation matrix
@@ -336,7 +336,7 @@ print(score_corr)
 
 # We can observe that corelation matrix is majorly negative and not showing any strong correlation of differnt columns with Total Score Extended.
 
-# In[93]:
+# In[281]:
 
 
 numeric_cols = all_data.select_dtypes(include=['float64', 'int64','uint8']).columns.tolist()
@@ -346,7 +346,7 @@ df_numeric = df_numeric.fillna(0)
 
 # Selecting all the numeric columns so we can normalize it by filling nans with 0 to perform regressor feature extraction and PCA to extract some features.
 
-# In[94]:
+# In[282]:
 
 
 # Create the scaler object
@@ -361,14 +361,14 @@ df_normalized = pd.DataFrame(df_scaled, columns=df_numeric.columns)
 
 # Normalizing the data so we have everything scaled within a range.
 
-# In[95]:
+# In[283]:
 
 
 y = df_normalized['Total Score extended']
 X = df_normalized.drop(['Total Score extended'], axis=1)
 
 
-# In[96]:
+# In[284]:
 
 
 # Fit the decision tree regressor to the data
@@ -380,7 +380,7 @@ importances = clf.feature_importances_
 importances
 
 
-# In[97]:
+# In[285]:
 
 
 # Calculate feature importances
@@ -400,7 +400,7 @@ importances_dict
 
 # # PCA
 
-# In[98]:
+# In[286]:
 
 
 # One-hot encode categorical variables
@@ -428,7 +428,7 @@ plt.ylabel('PCA 2')
 plt.show()
 
 
-# In[99]:
+# In[287]:
 
 
 #Extract the most important features
@@ -453,7 +453,7 @@ for i, (feature, score) in enumerate(top_features):
 
 # # Preparing the data
 
-# In[100]:
+# In[288]:
 
 
 import pandas as pd
@@ -470,7 +470,7 @@ result = all_data.groupby(['Participant name', 'Trial']).apply(aggregate_func).r
 result
 
 
-# In[101]:
+# In[289]:
 
 
 count = result.groupby('Participant name').size().reset_index(name='Count')
@@ -480,7 +480,7 @@ print(count)
 
 # Since we have multiple trials for each participant and rows are almost identical, we are extracting mode row, i.e. the one mostly repeated. Extracting one row for each trial and for each participant.
 
-# In[102]:
+# In[290]:
 
 
 import pandas as pd
@@ -495,7 +495,7 @@ result
 
 # Here, we are sorting the rows on the basis of trial id so we can treat this problem as time series. As this was highlighted in the feedback that this should be treated as time series problem.
 
-# In[103]:
+# In[291]:
 
 
 # Define the useful columns and dropping the rest
@@ -505,19 +505,19 @@ all_data = result.drop(columns=[col for col in result.columns if col not in cols
 
 # Here, we have idenfitifed and filtered out the useful features. The selection is based on their contribution as well as domain knowledge.
 
-# In[104]:
+# In[292]:
 
 
 all_data
 
 
-# In[105]:
+# In[293]:
 
 
 all_data['Participant name'] = all_data['Participant name'].str.extract(r'(\d+)')
 
 
-# In[106]:
+# In[294]:
 
 
 pd.reset_option('display.max_columns')
@@ -529,7 +529,7 @@ pd.reset_option('display.max_columns')
 pd.reset_option('display.max_rows')
 
 
-# In[107]:
+# In[295]:
 
 
 # Create the scaler object
@@ -545,13 +545,13 @@ df_normalized
 
 # # Training and Evaluating the Model
 
-# In[108]:
+# In[296]:
 
 
 from sklearn.model_selection import GroupShuffleSplit
 
 # Assuming your DataFrame is called 'df_normalized' and the target variable is called 'y'
-X = df_normalized.drop('Total Score extended', axis=1)
+X = df_normalized.drop(['Total Score extended','Participant name'], axis=1)
 y = df_normalized['Total Score extended']
 groups = df_normalized['Participant name']  # Specify the group variable
 
@@ -574,7 +574,7 @@ for train_index, test_index in group_shuffle_split.split(X, y, groups):
 
 # Here, we have normalized and splitted the data into train test. We will be using this split for our model training.
 
-# In[109]:
+# In[297]:
 
 
 from sklearn.model_selection import cross_val_score, GroupKFold
@@ -602,14 +602,16 @@ mean_score = scores.mean()
 std_score = scores.std()
 
 print("Mean Squared Error (MSE) on group k-fold cross-validation: {:.3f} +/- {:.3f}".format(mean_score, std_score))
+print("Mean R2 on group k-fold cross-validation:{:.3f}".format(df_scores_D2['MSE'].mean()))
+print("Variance",variance)
 df_scores_D2
 
 
-# Now, we are cross validating the rando forest regressor on 10 folds with group k fold method so we can have different participant each time when training and testing and also grouping them together, this will show us the actual performance of the model and we can handle the data leakage. Please note that we I have again changed the evaluation type and now this will be treated like a normal regression problem instead of a timeseries regression prblem as it does not make sense.
+# Now, we are cross validating the rando forest regressor on 10 folds with group k fold method so we can have different participant each time when training and testing and also grouping them together, this will show us the actual performance of the model and we can handle the data leakage. Please note that we I have again changed the evaluation type and now this will be treated like a normal regression problem instead of a timeseries regression problem as it does not make sense.
 
-# Here, we have validated the randomforest regressor with 10 folds. The mean of 10 fold MSE is **0.032** which is very low and this suggest that the model is quite accurate. We also have standard deviation of MSE on cross-validated folds which is **0.024**, again low deviation suggest the model is quite stable.
+# Here, we have validated the randomforest regressor with 10 folds. The mean of 10 fold MSE is **0.054** which is very low and we also have standard deviation of MSE on cross-validated folds which is **0.031**. But, we can see that mean R2 score is very low this suggest that model is **0.054** which is not good enough and is explaining less variance in the data than the baseline model, which is not desirable.
 
-# In[110]:
+# In[298]:
 
 
 import pandas as pd
@@ -640,13 +642,14 @@ print("R2 Score on test set: {:.3f}".format(r2))
 
 # # Predicting
 
-# In[111]:
+# In[299]:
 
 
 def predict(test):
     testDf = test.copy()
     y_pred = rf.predict(testDf)
     testDf['Total Score extended'] = y_pred
+    testDf['Participant name'] = 0
     y_pred_denormalized = scalerSelectedCols.inverse_transform(testDf)
     pred = pd.DataFrame(y_pred_denormalized)
     print("Empathy Score",pred.iloc[0][16])
@@ -667,7 +670,7 @@ predict(X_test)
 
 # # Dataset Comparison
 
-# In[112]:
+# In[300]:
 
 
 import matplotlib.pyplot as plt
@@ -701,7 +704,13 @@ ax2.legend()
 plt.show()
 
 
-# Here we have plotted the MSE and R2 score on each fold and we can clearly see that dataset II performed way better than dataset III. This is the reason we have selected this dataset.
+# Here we have plotted the MSE and R2 score on each fold and we can clearly see that dataset 3 has much more variance in R2 and MSE than dataset II but the mean MSE and R2 is almost similar. This suggest that changing the dataset is not actually helping to train a better model.
+
+# In[ ]:
+
+
+
+
 
 # In[ ]:
 
